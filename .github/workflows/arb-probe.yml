@@ -1,0 +1,19 @@
+name: Arb 160-bit probe
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/arb-probe.yml'
+      - 'experiments/probe_arb.py'
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install python-flint
+        run: python -m pip install --upgrade pip python-flint
+      - name: Probe Arb API at 160 bits
+        run: python experiments/probe_arb.py
