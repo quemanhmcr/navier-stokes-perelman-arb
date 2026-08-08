@@ -1,0 +1,35 @@
+name: Core geometry verification — Arb 160-bit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/verify-core.yml'
+      - 'experiments/verify_core.py'
+      - 'README.md'
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact + Arb stack
+        run: python -m pip install --upgrade pip 'python-flint==0.9.0' sympy
+      - name: Run all verification experiments at Arb 160 bits
+        run: |
+          set -o pipefail
+          python experiments/verify_core.py | tee verification-log.txt
+      - name: Publish human-readable summary
+        if: always()
+        run: |
+          if [ -f verification-summary.md ]; then cat verification-summary.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Upload verification artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arb-160-verification
+          path: |
+            verification-log.txt
+            verification-results.json
+            verification-summary.md
