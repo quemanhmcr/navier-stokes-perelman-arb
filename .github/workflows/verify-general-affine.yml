@@ -1,0 +1,31 @@
+name: General affine deformation — Arb 160-bit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/verify-general-affine.yml'
+      - 'experiments/verify_general_affine.py'
+jobs:
+  verify-general-affine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip 'python-flint==0.9.0'
+      - name: Run rigorous non-normal affine checks
+        run: |
+          set -o pipefail
+          python experiments/verify_general_affine.py | tee general-affine-log.txt
+      - name: Publish summary
+        if: always()
+        run: test ! -f general-affine-summary.md || cat general-affine-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: general-affine-arb-160
+          path: |
+            general-affine-log.txt
+            general-affine-results.json
+            general-affine-summary.md
