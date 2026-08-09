@@ -151,25 +151,33 @@ rec("ARB-RIGOROUS", "sampled-nonaffinity-strict-positivity", "PASS",
 # EXACT PERIODIC BETCHOV TEST ON A NONTRIVIAL FOURIER TRIAD
 # -----------------------------------------------------------------------------
 Iunit = sp.I
-modes_exact = {}
 
 def negk(k): return tuple(-q for q in k)
 
-def add_exact(k, vec, amp, kind):
-    amp = sp.Rational(amp.numerator, amp.denominator)
-    v = sp.Matrix([sp.Rational(q) for q in vec])
-    assert sum(sp.Integer(k[j])*v[j] for j in range(3)) == 0
-    if kind == 'cos':
-        cp = amp*v/2; cm = amp*v/2
-    else:
-        cp = -Iunit*amp*v/2; cm = Iunit*amp*v/2
-    modes_exact[k] = modes_exact.get(k, sp.zeros(3,1)) + cp
-    nk=negk(k); modes_exact[nk] = modes_exact.get(nk, sp.zeros(3,1)) + cm
-
 k1=(1,1,0); k2=(1,0,1); k3=(2,1,1)
-add_exact(k1,(1,-1,2),Fraction(1),'cos')
-add_exact(k2,(1,2,-1),Fraction(3,5),'sin')
-add_exact(k3,(1,-2,0),Fraction(7,6),'cos')
+V1=[(1,-1,0),(0,0,1),(1,-1,2)]
+V2=[(1,0,-1),(0,1,0),(1,2,-1)]
+V3=[(1,-2,0),(1,0,-2),(0,1,-1)]
+PHASES=[
+    ('cos','cos','cos'),('cos','cos','sin'),('cos','sin','cos'),('cos','sin','sin'),
+    ('sin','cos','cos'),('sin','cos','sin'),('sin','sin','cos'),('sin','sin','sin'),
+]
+
+def build_modes_exact(spec):
+    v1,v2,v3,kinds=spec
+    out={}
+    def add(k,vec,amp,kind):
+        amp=sp.Rational(amp.numerator,amp.denominator)
+        v=sp.Matrix([sp.Rational(q) for q in vec])
+        assert sum(sp.Integer(k[j])*v[j] for j in range(3)) == 0
+        if kind=='cos': cp=amp*v/2; cm=amp*v/2
+        else: cp=-Iunit*amp*v/2; cm=Iunit*amp*v/2
+        out[k]=out.get(k,sp.zeros(3,1))+cp
+        nk=negk(k); out[nk]=out.get(nk,sp.zeros(3,1))+cm
+    add(k1,v1,Fraction(1),kinds[0])
+    add(k2,v2,Fraction(3,5),kinds[1])
+    add(k3,v3,Fraction(7,6),kinds[2])
+    return out
 
 def Ahat_exact(k, uv):
     return sp.Matrix(3,3, lambda i,j: Iunit*sp.Integer(k[j])*uv[i])
@@ -177,6 +185,34 @@ def Shat_exact(k, uv):
     G=Ahat_exact(k,uv); return sp.simplify((G+G.T)/2)
 def what_exact(k, uv):
     kk=sp.Matrix(k); return sp.simplify(Iunit*kk.cross(uv))
+
+def exact_I(modes_in):
+    Sex0={k:Shat_exact(k,v) for k,v in modes_in.items()}
+    wex0={k:what_exact(k,v) for k,v in modes_in.items()}
+    keys0=list(modes_in); out=0
+    for ka in keys0:
+        for kb in keys0:
+            kc=tuple(-(ka[j]+kb[j]) for j in range(3))
+            if kc in modes_in:
+                out += (wex0[ka].T*Sex0[kb]*wex0[kc])[0]
+    return sp.simplify(out)
+
+chosen_spec=None; Iex=None
+for v1 in V1:
+    if chosen_spec is not None: break
+    for v2 in V2:
+        if chosen_spec is not None: break
+        for v3 in V3:
+            if chosen_spec is not None: break
+            for kinds in PHASES:
+                spec=(v1,v2,v3,kinds)
+                cand=exact_I(build_modes_exact(spec))
+                if cand != 0:
+                    chosen_spec=spec; Iex=cand; break
+if chosen_spec is None:
+    raise AssertionError("exact rational search found no nonzero vortex-stretching triad")
+
+modes_exact=build_modes_exact(chosen_spec)
 Aex={k:Ahat_exact(k,v) for k,v in modes_exact.items()}
 Sex={k:Shat_exact(k,v) for k,v in modes_exact.items()}
 wex={k:what_exact(k,v) for k,v in modes_exact.items()}
@@ -194,8 +230,7 @@ assert sp.simplify(T3ex + sp.Rational(3,4)*Iex) == 0
 assert sp.simplify(SAAex + Iex) == 0
 assert Iex != 0
 rec("EXACT", "betchov-and-global-affine-work", "PASS",
-    f"nonzero triad: <tr S^3>=-3/4<I>, <S:AA^T>=-<I>; exact I={Iex}")
-
+    f"CI-selected nonzero rational triad: spec={chosen_spec}; exact I={Iex}; Betchov and <S:AA^T>=-<I> hold")
 # -----------------------------------------------------------------------------
 # ARB COMPLEX-PAIR FOURIER CALCULUS: FILTERED FLUX IDENTITY
 # -----------------------------------------------------------------------------
@@ -259,10 +294,10 @@ def add_mode(k,vec,amp,kind):
         vm=[C(0, vv[i]*ampA*half) for i in range(3)]
     modes[k]=vp; modes[negk(k)]=vm
 
-add_mode(k1,(1,-1,2),Fraction(1),'cos')
-add_mode(k2,(1,2,-1),Fraction(3,5),'sin')
-add_mode(k3,(1,-2,0),Fraction(7,6),'cos')
-
+_cv1,_cv2,_cv3,_ckinds=chosen_spec
+add_mode(k1,_cv1,Fraction(1),_ckinds[0])
+add_mode(k2,_cv2,Fraction(3,5),_ckinds[1])
+add_mode(k3,_cv3,Fraction(7,6),_ckinds[2])
 def filt_field(field, aa):
     return {k:vscale(v,(-aa*A(ksq(k))).exp()) for k,v in field.items()}
 
